@@ -1,5 +1,6 @@
 "use client";
-
+import NewsSection from "../components/NewsSection"
+import StocksSection from "../components/StocksSection"
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -23,86 +24,17 @@ export default function Dashboard() {
 
   if (!user) return null;
 
-  const stocks = [
-    { name: "MRF.NS", company: "MRF Limited", price: "1,46,390", change: "green" },
-    { name: "TATASTEEL.NS", company: "Tata Steel Limited", price: "208.36", change: "green" },
-    { name: "^BSESN", company: "S&P BSE SENSEX", price: "82,814.71", change: "green" },
-    { name: "^NSEI", company: "NIFTY 50", price: "25,571.25", change: "green" },
-    { name: "LUPIN.NS", company: "Lupin Limited", price: "2,219.40", change: "red" },
-    { name: "PNB.BO", company: "Punjab National Bank", price: "129.65", change: "green" },
-  ];
-
   return (
     <div style={container}>
       
-      {/* LEFT SIDE - NEWS */}
       <div style={newsSection}>
-        <h1 style={newsMainTitle}>Stocks</h1>
-        <p style={newsDate}>26 February</p>
-
-        <div style={divider} />
-
-        <div style={article}>
-          <p style={source}>Business Today</p>
-          <h3 style={headline}>
-            Tata Steel, Infosys, HDFC Bank: How to trade these buzzing stocks
-          </h3>
-          <p style={summary}>
-            Indian benchmark indices kicked-off the week on a positive note...
-          </p>
-          <p style={time}>2d ago</p>
-        </div>
-
-        <div style={article}>
-          <p style={source}>The Economic Times</p>
-          <h3 style={headline}>
-            Tata Steel's Rs 3,200-crore Ludhiana plant to begin operations
-          </h3>
-          <p style={summary}>
-            Punjab Chief Minister Bhagwant Singh Mann announced...
-          </p>
-          <p style={time}>2d ago</p>
-        </div>
-      </div>
+  <NewsSection />
+</div>
 
       {/* RIGHT SIDE - STOCKS */}
       <div style={stockSection}>
-        
-        <div style={header}>
-          <h2>
-            Welcome!{" "}
-            <span style={{ color: "#00ffae" }}>
-              {user.email}
-            </span>
-          </h2>
-
-          <button onClick={logout} style={logoutBtn}>
-            Logout
-          </button>
-        </div>
-
-        {stocks.map((stock, index) => (
-          <div key={index} style={stockCard}>
-            <div>
-              <h3>{stock.name}</h3>
-              <p style={{ color: "#94a3b8" }}>{stock.company}</p>
-            </div>
-
-            <div style={{ textAlign: "right" }}>
-              <h3>{stock.price}</h3>
-              <div
-                style={{
-                  ...changeBadge,
-                  backgroundColor:
-                    stock.change === "green" ? "#16a34a" : "#dc2626",
-                }}
-              >
-                {stock.change === "green" ? "▲ Up" : "▼ Down"}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+  <StocksSection/>
+</div>
     </div>
   );
 }
