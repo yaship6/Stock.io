@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import axios from "axios"
 
-export default function NewsPage() {
+export default function NewsSection() {
 
   const [articles,setArticles] = useState([])
 
@@ -16,85 +16,91 @@ export default function NewsPage() {
 
     fetchNews()
 
-    const interval = setInterval(fetchNews,60000)
+    const interval = setInterval(fetchNews,5000)
 
     return () => clearInterval(interval)
 
   },[])
 
   return (
-    <div style={{padding:"40px"}}>
 
-      <h1>Stocks News</h1>
+    <div style={container}>
 
-      {articles.slice(0,10).map((article,index)=>(
-  <div key={index} style={newsCard}>
+      <h2 style={title}>📰 Market News</h2>
 
-    {article.urlToImage && (
-      <img
-        src={article.urlToImage}
-        style={newsImage}
-      />
-    )}
+      {articles.slice(0,6).map((article,index)=>(
 
-    <div>
-      <p style={source}>{article.source?.name}</p>
+        <div key={index} style={newsCard}>
 
-      <h3 style={headline}>
-        {article.title}
-      </h3>
+          {article.urlToImage && (
+            <img
+              src={article.urlToImage}
+              style={newsImage}
+            />
+          )}
 
-      <p style={summary}>
-        {article.description}
-      </p>
+          <div>
 
-      <a href={article.url} target="_blank" style={readMore}>
-        Read full article →
-      </a>
+            <p style={source}>{article.source?.name}</p>
+
+            <p style={headline}>
+              {article.title}
+            </p>
+
+            <a href={article.url} target="_blank" style={readMore}>
+              Read →
+            </a>
+
+          </div>
+
+        </div>
+
+      ))}
 
     </div>
 
-  </div>
-))}
-
-    </div>
   )
 }
+const container = {
+  background:"#0f172a",
+  padding:"20px",
+  borderRadius:"12px",
+  height:"100%",
+  overflowY:"auto"
+}
+
+const title = {
+  fontSize:"20px",
+  marginBottom:"20px"
+}
+
 const newsCard = {
-  display: "flex",
-  gap: "20px",
-  padding: "20px",
-  borderRadius: "12px",
-  background: "rgba(30,41,59,0.6)",
-  marginBottom: "20px",
-  border: "1px solid rgba(255,255,255,0.05)"
+  display:"flex",
+  gap:"15px",
+  marginBottom:"15px",
+  paddingBottom:"15px",
+  borderBottom:"1px solid rgba(255,255,255,0.05)"
 }
 
 const newsImage = {
-  width: "200px",
-  height: "120px",
-  objectFit: "cover",
-  borderRadius: "10px"
+  width:"120px",
+  height:"80px",
+  objectFit:"cover",
+  borderRadius:"8px"
 }
 
 const source = {
-  fontSize: "12px",
-  color: "#94a3b8"
+  fontSize:"12px",
+  color:"#94a3b8"
 }
 
 const headline = {
-  fontSize: "18px",
-  fontWeight: "600",
-  margin: "5px 0"
-}
-
-const summary = {
-  fontSize: "14px",
-  color: "#94a3b8"
+  fontSize:"14px",
+  fontWeight:"600"
 }
 
 const readMore = {
-  color: "#00ffae",
-  fontSize: "13px",
-  textDecoration: "none"
+  fontSize:"12px",
+  color:"#00ffae",
+  textDecoration:"none"
 }

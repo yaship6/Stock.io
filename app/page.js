@@ -133,6 +133,7 @@ const navLinks = {
   display: "flex",
   gap: "30px",
   fontSize: "14px",
+  color: "white",
 };
 
 
@@ -199,6 +200,9 @@ const heroImage = {
 
 const topStocksSection = {
   marginTop: "120px",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
 };
 
 const sectionTitle = {
@@ -208,14 +212,15 @@ const sectionTitle = {
 const stockCards = {
   display: "flex",
   gap: "25px",
-  flexWrap: "wrap",
+  flexWrap: "nowrap",
+  justifyContent: "center",
 };
 
 const stockCard = {
   backgroundColor: "#1e293b",
-  padding: "25px",
+  padding: "20px",
   borderRadius: "15px",
-  width: "220px",
+  width: "180px",
   transition: "0.3s",
 };
 

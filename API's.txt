@@ -1,0 +1,2 @@
+newsAPI:e744d3bb044949479e11e66e7ae01cf6
+Stocks api: (vantage) CUIV2R67G6YTSO75

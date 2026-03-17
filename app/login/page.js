@@ -25,6 +25,7 @@ export default function Signup() {
 
   return (
     <div style={pageStyle}>
+      <div style={overlay}></div>
       <div style={card}>
         <h2 style={title}>Create Account</h2>
 
@@ -73,17 +74,27 @@ export default function Signup() {
 }
 
 const pageStyle = {
-  minHeight: "100vh",
+  height: "100vh",
+  width: "100%",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
   fontFamily: "sans-serif",
-  background: `
-    radial-gradient(circle at 20% 30%, rgba(0,255,174,0.08), transparent 40%),
-    radial-gradient(circle at 80% 70%, rgba(0,255,174,0.06), transparent 40%),
-    linear-gradient(135deg, #020617 0%, #0a0f1f 40%, #020617 100%)
+  display: "grid",
+  placeItems: "center",
+  top: 0,
+  left: 0,
+  overflow: "hidden",   
+  boxSizing: "border-box",  
+
+  backgroundImage: `
+    linear-gradient(rgba(2,6,23,0.5), rgba(2,6,23,0.6)),
+    url('/landing-page.jpg')
   `,
-};
+backgroundSize: "cover",
+backgroundPosition: "center",   
+backgroundRepeat: "no-repeat",
+backgroundAttachment: "fixed",};
 
 const card = {
   background: "rgba(30, 41, 59, 0.7)",
@@ -95,6 +106,9 @@ const card = {
   flexDirection: "column",
   boxShadow: "0 20px 50px rgba(0,0,0,0.4)",
   border: "1px solid rgba(255,255,255,0.05)",
+
+  position: "fixed",
+  zIndex: 1,            
 };
 
 const title = {
@@ -139,4 +153,12 @@ const footerText = {
   fontSize: "14px",
   color: "#94a3b8",
   textAlign: "center",
+};
+
+const overlay = {
+  position: "fixed",
+  inset: 0,
+  backdropFilter: "blur(6px)",
+  backgroundColor: "rgba(0,0,0,0.25)",
+  zIndex: 0,
 };
