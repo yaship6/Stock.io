@@ -1,0 +1,84 @@
+/* src/components/TickerTape.css */
+.ticker-wrap {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  height: 36px;
+  overflow: hidden;
+  position: sticky;
+  top: 60px;
+  z-index: 90;
+}
+
+.ticker-label {
+  flex-shrink: 0;
+  background: var(--green-primary);
+  color: #020d06;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 12px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  letter-spacing: 1px;
+}
+
+.ticker-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.ticker-content::before,
+.ticker-content::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  z-index: 1;
+}
+.ticker-content::before { left: 0; background: linear-gradient(90deg, var(--bg-card), transparent); }
+.ticker-content::after { right: 0; background: linear-gradient(-90deg, var(--bg-card), transparent); }
+
+.ticker-track {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  animation: ticker 60s linear infinite;
+}
+
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+}
+
+.ticker-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.ticker-price {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ticker-change {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ticker-sep {
+  color: var(--text-muted);
+  font-size: 8px;
+}
