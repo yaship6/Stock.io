@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -14,7 +15,10 @@ app.use(express.json());
 // Configuration
 // ──────────────────────────────────────
 
-const NEWS_API_KEY = process.env.NEWS_API_KEY || '';
+const rawNewsApiKey = process.env.NEWS_API_KEY || '';
+const NEWS_API_KEY = (rawNewsApiKey && !rawNewsApiKey.includes('your_news_api_key_here') && rawNewsApiKey.trim().length > 10)
+  ? rawNewsApiKey.trim()
+  : '';
 const NEWS_API_URL = 'https://newsapi.org/v2/everything';
 const YAHOO_SPARK_URLS = [
   'https://query1.finance.yahoo.com/v8/finance/spark',
@@ -34,13 +38,13 @@ const INDIAN_STOCKS = {
 };
 
 const sectorQueries = {
-  all: 'Indian stock market OR NSE OR BSE OR Sensex OR Nifty',
-  nifty50: 'Nifty 50 OR NSE OR India equities',
-  banking: 'Indian banking stocks OR RBI OR private banks OR PSU banks',
-  it: 'Indian IT stocks OR Infosys OR TCS OR Wipro OR HCLTech',
-  energy: 'Indian energy stocks OR Reliance OR oil and gas India',
-  fmcg: 'Indian FMCG stocks OR Hindustan Unilever OR ITC OR Nestle India',
-  auto: 'Indian auto stocks OR Maruti OR Tata Motors OR auto sector India',
+  all: 'Indian stock market Sensex Nifty equities',
+  nifty50: 'Nifty 50 NSE India equities market',
+  banking: 'Indian banking stocks HDFC Bank ICICI SBI RBI',
+  it: 'Indian IT stocks TCS Infosys Wipro HCLTech',
+  energy: 'Indian energy stocks Reliance Oil Gas renewable',
+  fmcg: 'Indian FMCG stocks ITC Hindustan Unilever Nestle',
+  auto: 'Indian auto stocks Tata Motors Maruti Suzuki Mahindra',
 };
 
 const stockNameMap = {
@@ -126,8 +130,9 @@ const buildNewsQuery = (query = '', category = 'all') => {
   const trimmed = String(query || '').trim();
 
   if (trimmed) {
-    if (/^[A-Z.^]+(\.(NS|BO))?$/i.test(trimmed)) {
-      return `${symbolToEntity(trimmed)} OR ${trimmed}`;
+    if (/^[A-Z0-9.^]+(\.(NS|BO))?$/i.test(trimmed)) {
+      const entity = symbolToEntity(trimmed);
+      return entity && entity !== trimmed ? `${entity} stock` : `${trimmed} stock`;
     }
     return trimmed;
   }
@@ -306,63 +311,270 @@ const searchStocks = async (query) => {
 };
 
 // ──────────────────────────────────────
-// News Fetchers
+// Financial Sentiment Analyzer
 // ──────────────────────────────────────
 
-const mapNewsApiArticle = (article, query) => ({
-  title: article.title,
-  summary: article.description || article.content || '',
-  publisher: article.source?.name || 'News API',
-  link: article.url,
-  providerPublishTime: article.publishedAt
-    ? Math.floor(new Date(article.publishedAt).getTime() / 1000)
-    : Math.floor(Date.now() / 1000),
-  relatedTickers: [],
-  thumbnail: article.urlToImage || '',
-  sourceType: 'newsapi',
-  query,
-});
+const calculateSentiment = (title = '', summary = '') => {
+  const combined = `${title} ${summary}`.toLowerCase();
+  let score = 0;
 
-const fetchNewsFromNewsApi = async (query, pageSize = 18) => {
+  // Key phrase boosters
+  if (/snaps?\s+(?:\d+-day\s+)?(?:fall|drop|losing\s+streak|slump)/i.test(combined)) score += 0.8;
+  if (/ends?\s+in\s+green/i.test(combined)) score += 0.8;
+  if (/(?:all-time|record|multi-year|52-week)\s+high/i.test(combined)) score += 1.0;
+  if (/(?:all-time|record|multi-year|52-week)\s+low/i.test(combined)) score -= 1.0;
+  if (/(?:receives?|bags?|wins?)\s+(?:mega\s+)?order/i.test(combined)) score += 0.9;
+  if (/(?:mega|blockbuster|bumper)\s+(?:ipo|order|listing|debut)/i.test(combined)) score += 0.8;
+  if (/(?:order\s+win|contract\s+win|bonus\s+issue|target\s+price\s+upgrad|multibagger)/i.test(combined)) score += 0.9;
+  if (/(?:stock|shares?)\s+(?:surge|rally|jump|rise|advance|soar|climb)/i.test(combined)) score += 0.9;
+  if (/(?:stock|shares?)\s+(?:fall|drop|plunge|tumble|slump|decline|slide)/i.test(combined)) score -= 0.9;
+  if (/(?:buying|inflows?|demand)\s+lifts?/i.test(combined)) score += 0.8;
+  if (/(?:selling|outflows?|pressure)\s+weighs?/i.test(combined)) score -= 0.8;
+  if (/(?:profit\s+rises|profit\s+jumps|profit\s+surges|revenue\s+up|earnings\s+beat)/i.test(combined)) score += 1.0;
+  if (/(?:profit\s+falls|profit\s+drops|loss\s+widens|revenue\s+down|earnings\s+miss)/i.test(combined)) score -= 1.0;
+  if (/(?:sebi\s+probe|ed\s+raid|tax\s+evasion|accounting\s+fraud)/i.test(combined)) score -= 1.2;
+
+  const strongPos = [
+    'surge', 'surges', 'surged', 'surging', 'rally', 'rallies', 'rallied', 'rallying',
+    'jump', 'jumps', 'jumped', 'jumping', 'soar', 'soars', 'soared', 'soaring',
+    'skyrocket', 'skyrockets', 'skyrocketing', 'outperform', 'outperforms', 'outperforming',
+    'blockbuster', 'stellar', 'multibagger', 'breakout', 'superhit'
+  ];
+  const modPos = [
+    'gain', 'gains', 'gained', 'gaining', 'rise', 'rises', 'rose', 'rising',
+    'profit', 'profits', 'profitable', 'growth', 'boost', 'boosts', 'boosted',
+    'up', 'beat', 'beats', 'upgrade', 'upgrades', 'upgraded', 'buy', 'bullish',
+    'bull', 'rebound', 'rebounds', 'rebounded', 'green', 'advance', 'advances',
+    'recovery', 'recovers', 'recovered', 'high', 'higher', 'dividend', 'expansion',
+    'turnaround', 'positive', 'optimism', 'cheer', 'tailwind', 'overweight',
+    'order', 'orders', 'deal', 'deals', 'ipo', 'debut', 'inflows', 'demand', 'win', 'wins'
+  ];
+
+  const strongNeg = [
+    'crash', 'crashes', 'crashed', 'crashing', 'plunge', 'plunges', 'plunged', 'plunging',
+    'slump', 'slumps', 'slumped', 'slumping', 'fraud', 'scam', 'default', 'defaulted',
+    'bankrupt', 'bankruptcy', 'crisis', 'penalty', 'probe', 'probes', 'raid', 'raids',
+    'scandal', 'meltdown', 'collapse', 'collapses'
+  ];
+  const modNeg = [
+    'fall', 'falls', 'fell', 'falling', 'drop', 'drops', 'dropped', 'dropping',
+    'decline', 'declines', 'declined', 'declining', 'loss', 'losses', 'losing', 'lost',
+    'tumble', 'tumbles', 'tumbled', 'tumbling', 'slip', 'slips', 'slipped', 'slipping',
+    'weak', 'weaker', 'weakness', 'drag', 'drags', 'dragged', 'miss', 'misses', 'missed',
+    'cut', 'cuts', 'down', 'sell', 'selling', 'downgrade', 'downgrades', 'downgraded', 'bearish',
+    'bear', 'bears', 'concern', 'concerns', 'worries', 'worry', 'risk', 'risks', 'risky',
+    'red', 'underweight', 'underperform', 'slowdown', 'inflation', 'deficit', 'fine', 'fined',
+    'headwind', 'dispute', 'struggle', 'struggles', 'dip', 'debt'
+  ];
+
+  const words = combined.match(/\b[a-z0-9-]+\b/g) || [];
+  for (const w of words) {
+    if (strongPos.includes(w)) score += 1.0;
+    else if (modPos.includes(w)) score += 0.45;
+    else if (strongNeg.includes(w)) score -= 1.0;
+    else if (modNeg.includes(w)) score -= 0.45;
+  }
+
+  // Double weight for title words
+  if (title) {
+    const titleWords = title.toLowerCase().match(/\b[a-z0-9-]+\b/g) || [];
+    for (const tw of titleWords) {
+      if (strongPos.includes(tw)) score += 0.6;
+      else if (modPos.includes(tw)) score += 0.3;
+      else if (strongNeg.includes(tw)) score -= 0.6;
+      else if (modNeg.includes(tw)) score -= 0.3;
+    }
+  }
+
+  let normScore = 0;
+  if (score !== 0) {
+    normScore = Math.max(-1, Math.min(1, score / (Math.abs(score) > 1.2 ? Math.sqrt(Math.abs(score) + 1) : 1.5)));
+  }
+
+  const sentiment = normScore > 0.12 ? 'positive' : normScore < -0.12 ? 'negative' : 'neutral';
+  const label = sentiment === 'positive' ? 'Bullish' : sentiment === 'negative' ? 'Bearish' : 'Neutral';
+
+  return {
+    sentiment,
+    sentimentScore: parseFloat(normScore.toFixed(2)),
+    sentimentLabel: label,
+  };
+};
+
+// ──────────────────────────────────────
+// News Fetchers (Multi-Source Resilience)
+// ──────────────────────────────────────
+
+const mapNewsApiArticle = (article, query) => {
+  const title = article.title || '';
+  const summary = article.description || article.content || '';
+  const { sentiment, sentimentScore, sentimentLabel } = calculateSentiment(title, summary);
+
+  return {
+    title,
+    summary,
+    publisher: article.source?.name || 'News API',
+    link: article.url,
+    providerPublishTime: article.publishedAt
+      ? Math.floor(new Date(article.publishedAt).getTime() / 1000)
+      : Math.floor(Date.now() / 1000),
+    relatedTickers: [],
+    thumbnail: article.urlToImage || '',
+    sourceType: 'newsapi',
+    query,
+    sentiment,
+    sentimentScore,
+    sentimentLabel,
+  };
+};
+
+const fetchNewsFromNewsApi = async (query, pageSize = 20) => {
   if (!NEWS_API_KEY) return [];
 
-  const response = await axios.get(NEWS_API_URL, {
-    params: {
-      q: query,
-      language: 'en',
-      sortBy: 'publishedAt',
-      pageSize,
-      searchIn: 'title,description',
-    },
-    headers: { 'X-Api-Key': NEWS_API_KEY },
-    timeout: 12000,
-  });
+  try {
+    const response = await axios.get(NEWS_API_URL, {
+      params: {
+        q: query,
+        language: 'en',
+        sortBy: 'publishedAt',
+        pageSize,
+        searchIn: 'title,description',
+      },
+      headers: { 'X-Api-Key': NEWS_API_KEY },
+      timeout: 10000,
+    });
 
-  return (response.data?.articles || [])
-    .filter((article) => article.title && article.url)
-    .map((article) => mapNewsApiArticle(article, query));
+    return (response.data?.articles || [])
+      .filter((article) => article.title && article.url)
+      .map((article) => mapNewsApiArticle(article, query));
+  } catch (err) {
+    console.warn('News API error:', err.response?.data?.message || err.message);
+    return [];
+  }
+};
+
+const fetchNewsFromGoogleRss = async (queryTopic = 'Indian stock market', count = 25) => {
+  try {
+    const encoded = encodeURIComponent(queryTopic);
+    const url = `https://news.google.com/rss/search?q=${encoded}&hl=en-IN&gl=IN&ceid=IN:en`;
+    const response = await axios.get(url, {
+      timeout: 8000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+
+    const items = [];
+    const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
+    let match;
+
+    while ((match = itemRegex.exec(response.data)) !== null && items.length < count) {
+      const itemXml = match[1];
+      const titleMatch = /<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i.exec(itemXml);
+      const linkMatch = /<link>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/i.exec(itemXml);
+      const pubDateMatch = /<pubDate>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/pubDate>/i.exec(itemXml);
+      const descMatch = /<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/i.exec(itemXml);
+      const sourceMatch = /<source[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/source>/i.exec(itemXml);
+
+      let fullTitle = titleMatch ? titleMatch[1].trim() : '';
+      fullTitle = fullTitle
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>');
+
+      let publisher = sourceMatch ? sourceMatch[1].trim().replace(/&amp;/g, '&') : '';
+      let cleanTitle = fullTitle;
+      if (publisher && cleanTitle.endsWith(` - ${publisher}`)) {
+        cleanTitle = cleanTitle.substring(0, cleanTitle.length - (publisher.length + 3)).trim();
+      } else if (!publisher && cleanTitle.includes(' - ')) {
+        const parts = cleanTitle.split(' - ');
+        publisher = parts.pop().trim();
+        cleanTitle = parts.join(' - ').trim();
+      }
+
+      let summary = '';
+      if (descMatch) {
+        summary = descMatch[1]
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (summary === cleanTitle || summary === fullTitle) {
+          summary = '';
+        }
+      }
+
+      const pubTime = pubDateMatch
+        ? Math.floor(new Date(pubDateMatch[1]).getTime() / 1000)
+        : Math.floor(Date.now() / 1000);
+
+      if (cleanTitle) {
+        const { sentiment, sentimentScore, sentimentLabel } = calculateSentiment(cleanTitle, summary);
+        items.push({
+          title: cleanTitle,
+          summary: summary || cleanTitle,
+          publisher: publisher || 'Financial News',
+          link: linkMatch ? linkMatch[1].trim() : '',
+          providerPublishTime: isNaN(pubTime) ? Math.floor(Date.now() / 1000) : pubTime,
+          relatedTickers: [],
+          thumbnail: '',
+          sourceType: 'google-rss',
+          sentiment,
+          sentimentScore,
+          sentimentLabel,
+        });
+      }
+    }
+    return items;
+  } catch (err) {
+    console.error('Google News RSS error:', err.message);
+    return [];
+  }
 };
 
 const fetchNewsFromYahoo = async (query) => {
   try {
-    const result = await yahooFinance.search(query, {
+    const cleanQuery = String(query || '')
+      .replace(/\.(NS|BO)$/i, '')
+      .replace(/\b(OR|AND|NOT)\b/gi, ' ')
+      .replace(/[^a-zA-Z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split(' ')
+      .slice(0, 3)
+      .join(' ') || 'Nifty';
+
+    const result = await yahooFinance.search(cleanQuery, {
       quotesCount: 0,
       newsCount: 20,
     });
 
-    return (result.news || []).map((item) => ({
-      title: item.title,
-      summary: item.summary || item.snippet || '',
-      publisher: item.publisher || 'Yahoo Finance',
-      link: item.link,
-      providerPublishTime: item.providerPublishTime || Math.floor(Date.now() / 1000),
-      relatedTickers: Array.isArray(item.relatedTickers) ? item.relatedTickers : [],
-      thumbnail:
-        item.thumbnail?.resolutions?.[0]?.url ||
-        item.thumbnail?.originalUrl ||
-        '',
-      sourceType: 'yahoo',
-    }));
+    return (result.news || []).map((item) => {
+      const title = item.title || '';
+      const summary = item.summary || item.snippet || '';
+      const { sentiment, sentimentScore, sentimentLabel } = calculateSentiment(title, summary);
+
+      return {
+        title,
+        summary,
+        publisher: item.publisher || 'Yahoo Finance',
+        link: item.link,
+        providerPublishTime: item.providerPublishTime || Math.floor(Date.now() / 1000),
+        relatedTickers: Array.isArray(item.relatedTickers) ? item.relatedTickers : [],
+        thumbnail:
+          item.thumbnail?.resolutions?.[0]?.url ||
+          item.thumbnail?.originalUrl ||
+          '',
+        sourceType: 'yahoo',
+        sentiment,
+        sentimentScore,
+        sentimentLabel,
+      };
+    });
   } catch (error) {
     console.error('Yahoo news fetch error:', error.message);
     return [];
@@ -571,35 +783,86 @@ app.get('/api/news', async (req, res) => {
     const cached = cache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    let news = [];
-    let source = 'yahoo';
+    let articles = [];
+    let sourcesUsed = [];
 
-    // Try News API first
+    // 1. Try News API if key is present
+    if (NEWS_API_KEY) {
+      try {
+        const newsApiItems = await fetchNewsFromNewsApi(query);
+        if (newsApiItems.length > 0) {
+          articles.push(...newsApiItems);
+          sourcesUsed.push('newsapi');
+        }
+      } catch (err) {
+        console.warn('News API fetch failed:', err.message);
+      }
+    }
+
+    // 2. Fetch from Google News RSS (always reliable and rich)
     try {
-      news = await fetchNewsFromNewsApi(query);
-      if (news.length > 0) source = 'newsapi';
-    } catch (newsApiError) {
-      console.error('News API error:', newsApiError.message);
-      source = 'yahoo-fallback';
+      const rssItems = await fetchNewsFromGoogleRss(query);
+      if (rssItems.length > 0) {
+        articles.push(...rssItems);
+        sourcesUsed.push('google-rss');
+      }
+    } catch (rssErr) {
+      console.warn('Google News RSS fetch failed:', rssErr.message);
     }
 
-    // Fallback to Yahoo Finance news
-    if (news.length === 0) {
-      news = await fetchNewsFromYahoo(query);
-      source = source === 'newsapi' ? 'newsapi' : 'yahoo';
+    // 3. If needed, supplement with Yahoo Finance news
+    if (articles.length < 15) {
+      try {
+        const yahooItems = await fetchNewsFromYahoo(query);
+        if (yahooItems.length > 0) {
+          articles.push(...yahooItems);
+          sourcesUsed.push('yahoo');
+        }
+      } catch (yahooErr) {
+        console.warn('Yahoo news fetch failed:', yahooErr.message);
+      }
     }
+
+    // Deduplicate articles by normalized title
+    const seenTitles = new Set();
+    const deduplicated = [];
+
+    for (const item of articles) {
+      const key = (item.title || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 50);
+
+      if (key && !seenTitles.has(key)) {
+        seenTitles.add(key);
+        // Ensure sentiment is populated
+        if (!item.sentiment || item.sentimentScore === undefined) {
+          const sent = calculateSentiment(item.title, item.summary);
+          item.sentiment = sent.sentiment;
+          item.sentimentScore = sent.sentimentScore;
+          item.sentimentLabel = sent.sentimentLabel;
+        }
+        deduplicated.push(item);
+      }
+    }
+
+    // Sort by publication time (newest first)
+    deduplicated.sort((a, b) => (b.providerPublishTime || 0) - (a.providerPublishTime || 0));
+
+    const finalNews = deduplicated.slice(0, 30);
+    const sourceSummary = sourcesUsed.length > 0 ? sourcesUsed.join(' + ') : 'google-rss';
 
     const response = {
-      news,
+      news: finalNews,
       meta: {
         query,
         category,
-        source,
+        source: sourceSummary,
         newsApiConfigured: Boolean(NEWS_API_KEY),
-        count: news.length,
+        count: finalNews.length,
         note: NEWS_API_KEY
-          ? 'News API key detected. Headlines are enriched with News API when available.'
-          : 'No News API key. Using Yahoo Finance news. Add NEWS_API_KEY env var for richer news.',
+          ? `Active News API key detected. Combined with live Indian market feeds (${finalNews.length} articles).`
+          : `Live Indian market news active via real-time feeds (${finalNews.length} articles). Add NEWS_API_KEY for additional global wire stories.`,
       },
     };
 

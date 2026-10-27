@@ -29,13 +29,31 @@ const timeAgo = (ts) => {
   return `${Math.floor(diff / 86400)}d ago`;
 };
 
-const getSentiment = (title = '') => {
-  const positiveWords = ['surges', 'rises', 'high', 'profit', 'growth', 'strong', 'record', 'gains', 'up', 'beats'];
-  const negativeWords = ['falls', 'drops', 'concern', 'tightens', 'loss', 'down', 'decline', 'crash', 'weak', 'misses'];
-  const normalized = title.toLowerCase();
-  if (positiveWords.some((word) => normalized.includes(word))) return 'positive';
-  if (negativeWords.some((word) => normalized.includes(word))) return 'negative';
-  return 'neutral';
+const getSentiment = (title = '', summary = '') => {
+  const combined = `${title} ${summary}`.toLowerCase();
+  let score = 0;
+
+  if (/snaps?\s+(?:\d+-day\s+)?(?:fall|drop|losing\s+streak|slump)/i.test(combined)) score += 0.8;
+  if (/ends?\s+in\s+green/i.test(combined)) score += 0.8;
+  if (/(?:all-time|record|multi-year|52-week)\s+high/i.test(combined)) score += 1.0;
+  if (/(?:all-time|record|multi-year|52-week)\s+low/i.test(combined)) score -= 1.0;
+  if (/(?:profit\s+rises|profit\s+jumps|profit\s+surges|revenue\s+up|order\s+win)/i.test(combined)) score += 1.0;
+  if (/(?:profit\s+falls|profit\s+drops|loss\s+widens|revenue\s+down)/i.test(combined)) score -= 1.0;
+
+  const strongPos = ['surge', 'surges', 'surged', 'rally', 'rallies', 'jump', 'jumps', 'soar', 'soars', 'skyrocket', 'outperform', 'stellar'];
+  const modPos = ['gain', 'gains', 'rise', 'rises', 'profit', 'profits', 'growth', 'boost', 'up', 'beat', 'beats', 'upgrade', 'buy', 'bullish', 'rebound', 'green', 'advance', 'recovery', 'high'];
+  const strongNeg = ['crash', 'crashes', 'plunge', 'plunges', 'slump', 'slumps', 'fraud', 'scam', 'default', 'penalty', 'probe', 'raid'];
+  const modNeg = ['fall', 'falls', 'drop', 'drops', 'decline', 'declines', 'loss', 'losses', 'tumble', 'slip', 'slips', 'weak', 'drag', 'miss', 'cut', 'down', 'sell', 'downgrade', 'bearish', 'concern', 'worries', 'risk'];
+
+  const words = combined.match(/\b[a-z0-9-]+\b/g) || [];
+  for (const w of words) {
+    if (strongPos.includes(w)) score += 1.0;
+    else if (modPos.includes(w)) score += 0.5;
+    else if (strongNeg.includes(w)) score -= 1.0;
+    else if (modNeg.includes(w)) score -= 0.5;
+  }
+
+  return score > 0.3 ? 'positive' : score < -0.3 ? 'negative' : 'neutral';
 };
 
 const sentimentLabels = {
@@ -45,7 +63,7 @@ const sentimentLabels = {
 };
 
 const NewsCard = ({ article, featured = false }) => {
-  const sentiment = getSentiment(article.title);
+  const sentiment = article.sentiment || getSentiment(article.title, article.summary);
 
   return (
     <a href={article.link} target="_blank" rel="noopener noreferrer" className={`news-card ${featured ? 'featured' : ''}`}>
@@ -61,7 +79,7 @@ const NewsCard = ({ article, featured = false }) => {
             <span className="news-dot">•</span>
             <span className="news-time"><Clock size={11} />{timeAgo(article.providerPublishTime)}</span>
           </div>
-          <span className={`news-sentiment ${sentiment}`}>{sentimentLabels[sentiment]}</span>
+          <span className={`news-sentiment ${sentiment}`}>{sentimentLabels[sentiment] || 'Neutral'}</span>
         </div>
         <h3 className="news-title">{article.title}</h3>
         {article.summary && <p className="news-summary">{article.summary}</p>}
@@ -93,7 +111,12 @@ const News = () => {
   const sentimentBreakdown = useMemo(() => {
     const counts = { positive: 0, neutral: 0, negative: 0 };
     displayedNews.forEach((article) => {
-      counts[getSentiment(article.title)] += 1;
+      const s = article.sentiment || getSentiment(article.title, article.summary);
+      if (counts[s] !== undefined) {
+        counts[s] += 1;
+      } else {
+        counts.neutral += 1;
+      }
     });
     const total = displayedNews.length || 1;
     return [

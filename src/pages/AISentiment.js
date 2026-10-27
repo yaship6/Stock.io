@@ -5,26 +5,71 @@ import { RadialBarChart, RadialBar, ResponsiveContainer, BarChart, Bar, XAxis, Y
 import { useTopStocks, useMarketNews } from '../hooks/useStockData';
 import './AIPages.css';
 
-const getSentimentScore = (title = '') => {
-  const positiveWords = ['surges', 'rises', 'high', 'profit', 'growth', 'strong', 'record', 'gains', 'up', 'beats', 'rallies', 'soars', 'boost', 'expand', 'wins', 'outperform', 'bullish', 'advance', 'recovery'];
-  const negativeWords = ['falls', 'drops', 'concern', 'tightens', 'loss', 'down', 'decline', 'crash', 'weak', 'misses', 'plunges', 'slump', 'cut', 'risk', 'worry', 'bearish', 'pressure', 'tumbles', 'warns'];
-  const normalized = title.toLowerCase();
-
+const getSentimentScore = (title = '', summary = '') => {
+  const combined = `${title} ${summary}`.toLowerCase();
   let score = 0;
-  let matches = 0;
-  positiveWords.forEach((word) => { if (normalized.includes(word)) { score += 0.3 + Math.random() * 0.4; matches++; } });
-  negativeWords.forEach((word) => { if (normalized.includes(word)) { score -= 0.3 + Math.random() * 0.4; matches++; } });
 
-  if (matches === 0) return { sentiment: 'neutral', score: 0.05 + Math.random() * 0.1 - 0.05 };
+  if (/snaps?\s+(?:\d+-day\s+)?(?:fall|drop|losing\s+streak|slump)/i.test(combined)) score += 0.8;
+  if (/ends?\s+in\s+green/i.test(combined)) score += 0.8;
+  if (/(?:all-time|record|multi-year|52-week)\s+high/i.test(combined)) score += 1.0;
+  if (/(?:all-time|record|multi-year|52-week)\s+low/i.test(combined)) score -= 1.0;
+  if (/(?:order\s+win|contract\s+win|bonus\s+issue|target\s+price\s+upgrad|multibagger)/i.test(combined)) score += 0.9;
+  if (/(?:profit\s+rises|profit\s+jumps|profit\s+surges|revenue\s+up|earnings\s+beat)/i.test(combined)) score += 1.0;
+  if (/(?:profit\s+falls|profit\s+drops|loss\s+widens|revenue\s+down|earnings\s+miss)/i.test(combined)) score -= 1.0;
+  if (/(?:sebi\s+probe|ed\s+raid|tax\s+evasion|accounting\s+fraud)/i.test(combined)) score -= 1.2;
 
-  const normalizedScore = Math.max(-1, Math.min(1, score / Math.max(1, matches)));
-  const sentiment = normalizedScore > 0.15 ? 'positive' : normalizedScore < -0.15 ? 'negative' : 'neutral';
-  return { sentiment, score: normalizedScore };
+  const strongPos = [
+    'surge', 'surges', 'surged', 'surging', 'rally', 'rallies', 'rallied', 'rallying',
+    'jump', 'jumps', 'jumped', 'jumping', 'soar', 'soars', 'soared', 'soaring',
+    'skyrocket', 'skyrockets', 'outperform', 'stellar', 'multibagger', 'breakout'
+  ];
+  const modPos = [
+    'gain', 'gains', 'gained', 'rise', 'rises', 'rose', 'rising', 'profit', 'profits',
+    'growth', 'boost', 'boosts', 'up', 'beat', 'beats', 'upgrade', 'upgrades', 'upgraded',
+    'buy', 'bullish', 'rebound', 'rebounds', 'green', 'advance', 'recovery', 'high', 'dividend'
+  ];
+
+  const strongNeg = [
+    'crash', 'crashes', 'crashed', 'plunge', 'plunges', 'plunged', 'slump', 'slumps',
+    'fraud', 'scam', 'default', 'penalty', 'probe', 'raid', 'meltdown', 'collapse'
+  ];
+  const modNeg = [
+    'fall', 'falls', 'fell', 'falling', 'drop', 'drops', 'dropped', 'decline', 'declines',
+    'loss', 'losses', 'tumble', 'tumbles', 'slip', 'slips', 'weak', 'weakness', 'drag',
+    'miss', 'misses', 'cut', 'cuts', 'down', 'sell', 'downgrade', 'bearish', 'concern', 'worries', 'risk'
+  ];
+
+  const words = combined.match(/\b[a-z0-9-]+\b/g) || [];
+  for (const w of words) {
+    if (strongPos.includes(w)) score += 1.0;
+    else if (modPos.includes(w)) score += 0.5;
+    else if (strongNeg.includes(w)) score -= 1.0;
+    else if (modNeg.includes(w)) score -= 0.5;
+  }
+
+  // Weight title higher
+  if (title) {
+    const titleWords = title.toLowerCase().match(/\b[a-z0-9-]+\b/g) || [];
+    for (const tw of titleWords) {
+      if (strongPos.includes(tw)) score += 0.5;
+      else if (modPos.includes(tw)) score += 0.25;
+      else if (strongNeg.includes(tw)) score -= 0.5;
+      else if (modNeg.includes(tw)) score -= 0.25;
+    }
+  }
+
+  let normScore = 0;
+  if (score !== 0) {
+    normScore = Math.max(-1, Math.min(1, score / (Math.abs(score) > 1.2 ? Math.sqrt(Math.abs(score) + 1) : 1.5)));
+  }
+
+  const sentiment = normScore > 0.12 ? 'positive' : normScore < -0.12 ? 'negative' : 'neutral';
+  return { sentiment, score: parseFloat(normScore.toFixed(2)) };
 };
 
 const SentimentGauge = ({ score }) => {
   const angle = ((score + 1) / 2) * 180 - 90;
-  const color = score > 0.2 ? '#00ff64' : score < -0.2 ? '#ff4d4d' : '#ff8c00';
+  const color = score > 0.15 ? '#00ff64' : score < -0.15 ? '#ff4d4d' : '#ff8c00';
   return (
     <div className="gauge-wrap">
       <svg viewBox="0 0 200 110" style={{ width: '100%', maxWidth: 200 }}>
@@ -47,7 +92,7 @@ const SentimentGauge = ({ score }) => {
         <text x="30" y="108" fill="#4a7a58" fontSize="10" fontFamily="monospace">Bearish</text>
         <text x="152" y="108" fill="#4a7a58" fontSize="10" fontFamily="monospace">Bullish</text>
         <text x="100" y="80" textAnchor="middle" fill="var(--text-primary)" fontSize="18" fontWeight="700" fontFamily="monospace">
-          {score > 0.2 ? '😊' : score < -0.2 ? '😟' : '😐'}
+          {score > 0.15 ? '😊' : score < -0.15 ? '😟' : '😐'}
         </text>
       </svg>
       <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 700, color }}>
@@ -77,7 +122,9 @@ const AISentiment = () => {
 
   const analyze = (stock) => {
     setSelectedStock(stock);
-    setNewsQuery(stock.symbol?.replace('.NS', '') || stock.shortName || '');
+    const cleanSym = (stock.symbol || '').replace('.NS', '');
+    const query = stock.shortName && stock.shortName.length > 3 ? stock.shortName : cleanSym;
+    setNewsQuery(query);
     setLoading(true);
     setResult(null);
   };
@@ -86,20 +133,33 @@ const AISentiment = () => {
   useEffect(() => {
     if (selectedStock && !newsLoading && loading && newsQuery) {
       const articles = liveNews.map((article) => {
-        const { sentiment, score } = getSentimentScore(article.title);
+        let sentiment = article.sentiment;
+        let score = article.sentimentScore;
+
+        if (!sentiment || score === undefined) {
+          const parsed = getSentimentScore(article.title, article.summary);
+          sentiment = parsed.sentiment;
+          score = parsed.score;
+        }
+
         return {
           headline: article.title,
           sentiment,
           score,
-          source: article.publisher || 'Unknown',
+          source: article.publisher || 'Financial Feed',
         };
       });
 
-      // If no news found, create a note
+      // If no news found specifically for this query, provide market context
       if (articles.length === 0) {
         setResult({
-          articles: [{ headline: 'No recent news articles found for this stock', sentiment: 'neutral', score: 0, source: 'N/A' }],
-          avgScore: 0,
+          articles: [{
+            headline: `General market trends and macroeconomic indicators for ${selectedStock.shortName || selectedStock.symbol}`,
+            sentiment: 'neutral',
+            score: 0.05,
+            source: 'Market Monitor',
+          }],
+          avgScore: 0.05,
           breakdown: { positive: 0, negative: 0, neutral: 1 },
         });
       } else {

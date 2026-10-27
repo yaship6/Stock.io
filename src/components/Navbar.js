@@ -1,5 +1,4 @@
-// src/components/Navbar.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -15,6 +14,7 @@ const Navbar = () => {
   const { theme, toggleTheme, isDark } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
+  const dropdownRef = useRef(null);
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [aiDropdown, setAiDropdown] = useState(false);
@@ -24,6 +24,27 @@ const Navbar = () => {
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // Close dropdown on outside click/tap
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setAiDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
+
+  // Close menus on navigation
+  useEffect(() => {
+    setAiDropdown(false);
+    setMobileOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = () => { logout(); navigate('/'); };
   const isActive = (path) => location.pathname === path;
@@ -58,14 +79,28 @@ const Navbar = () => {
             </Link>
           ))}
 
-          <div className="nav-dropdown" onMouseEnter={() => setAiDropdown(true)} onMouseLeave={() => setAiDropdown(false)}>
-            <button className={`nav-link ${aiLinks.some(l => isActive(l.to)) ? 'active' : ''}`}>
+          <div className="nav-dropdown" ref={dropdownRef}>
+            <button
+              type="button"
+              className={`nav-link ${aiLinks.some(l => isActive(l.to)) ? 'active' : ''} ${aiDropdown ? 'dropdown-open' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setAiDropdown(prev => !prev);
+              }}
+              aria-expanded={aiDropdown}
+            >
               <Brain size={15} /> AI Models <ChevronDown size={12} className={aiDropdown ? 'rotated' : ''} />
             </button>
             {aiDropdown && (
               <div className="dropdown-menu">
                 {aiLinks.map(link => (
-                  <Link key={link.to} to={link.to} className={`dropdown-item ${isActive(link.to) ? 'active' : ''}`}>
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    className={`dropdown-item ${isActive(link.to) ? 'active' : ''}`}
+                    onClick={() => setAiDropdown(false)}
+                  >
                     {link.icon}{link.label}
                   </Link>
                 ))}
