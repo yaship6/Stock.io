@@ -1,5 +1,9 @@
 /* src/pages/AIPages.css */
 
+.ai-page .container {
+  padding-top: 130px !important;
+}
+
 /* Header */
 .ai-header {
   display: flex;

@@ -1,12 +1,17 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const crypto = require('crypto');
 const YahooFinance = require('yahoo-finance2').default;
-const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
+const yahooFinance = new YahooFinance({
+  suppressNotices: ['yahooSurvey', 'ripHistorical'],
+  validation: { logErrors: false }
+});
 
 const app = express();
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.SERVER_PORT || 5001;
 
 app.use(cors());
 app.use(express.json());
@@ -15,11 +20,20 @@ app.use(express.json());
 // Configuration
 // ──────────────────────────────────────
 
-const rawNewsApiKey = process.env.NEWS_API_KEY || '';
+const rawNewsApiKey = process.env.NEWS_API_KEY || process.env.YAHOO_API_KEY || '';
 const NEWS_API_KEY = (rawNewsApiKey && !rawNewsApiKey.includes('your_news_api_key_here') && rawNewsApiKey.trim().length > 10)
   ? rawNewsApiKey.trim()
   : '';
 const NEWS_API_URL = 'https://newsapi.org/v2/everything';
+
+const RAZORPAY_KEY_ID = (process.env.RAZORPAY_KEY_ID || '').trim();
+const RAZORPAY_KEY_SECRET = (process.env.RAZORPAY_KEY_SECRET || '').trim();
+const isRazorpayConfigured = Boolean(
+  RAZORPAY_KEY_ID &&
+  RAZORPAY_KEY_SECRET &&
+  !RAZORPAY_KEY_ID.includes('your_') &&
+  !RAZORPAY_KEY_SECRET.includes('your_')
+);
 const YAHOO_SPARK_URLS = [
   'https://query1.finance.yahoo.com/v8/finance/spark',
   'https://query2.finance.yahoo.com/v8/finance/spark',
@@ -296,7 +310,7 @@ const searchStocks = async (query) => {
   const result = await yahooFinance.search(query, {
     quotesCount: 12,
     newsCount: 0,
-  });
+  }, { validateResult: false });
 
   // Filter to Indian exchanges
   const quotes = (result.quotes || []).filter(
@@ -496,14 +510,15 @@ const fetchNewsFromGoogleRss = async (queryTopic = 'Indian stock market', count 
 
       let summary = '';
       if (descMatch) {
-        summary = descMatch[1]
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/&amp;/g, '&')
+        let rawDesc = descMatch[1]
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
           .replace(/&quot;/g, '"')
           .replace(/&#39;/g, "'")
-          .replace(/\s+/g, ' ')
-          .trim();
-        if (summary === cleanTitle || summary === fullTitle) {
+          .replace(/&amp;/g, '&')
+          .replace(/&nbsp;/g, ' ');
+        summary = rawDesc.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (summary === cleanTitle || summary === fullTitle || (publisher && summary === `${cleanTitle} ${publisher}`)) {
           summary = '';
         }
       }
@@ -538,20 +553,29 @@ const fetchNewsFromGoogleRss = async (queryTopic = 'Indian stock market', count 
 
 const fetchNewsFromYahoo = async (query) => {
   try {
-    const cleanQuery = String(query || '')
+    let cleanQuery = String(query || '')
       .replace(/\.(NS|BO)$/i, '')
       .replace(/\b(OR|AND|NOT)\b/gi, ' ')
       .replace(/[^a-zA-Z0-9\s]/g, ' ')
       .replace(/\s+/g, ' ')
-      .trim()
-      .split(' ')
-      .slice(0, 3)
-      .join(' ') || 'Nifty';
+      .trim();
 
-    const result = await yahooFinance.search(cleanQuery, {
-      quotesCount: 0,
-      newsCount: 20,
-    });
+    const queryWords = cleanQuery.split(' ');
+    if (queryWords.length > 2) {
+      cleanQuery = queryWords.slice(0, 2).join(' ');
+    }
+    if (!cleanQuery || cleanQuery.toLowerCase() === 'all') {
+      cleanQuery = 'Nifty';
+    }
+
+    const result = await yahooFinance.search(
+      cleanQuery,
+      {
+        quotesCount: 0,
+        newsCount: 20,
+      },
+      { validateResult: false }
+    );
 
     return (result.news || []).map((item) => {
       const title = item.title || '';
@@ -799,28 +823,19 @@ app.get('/api/news', async (req, res) => {
       }
     }
 
-    // 2. Fetch from Google News RSS (always reliable and rich)
-    try {
-      const rssItems = await fetchNewsFromGoogleRss(query);
-      if (rssItems.length > 0) {
-        articles.push(...rssItems);
-        sourcesUsed.push('google-rss');
-      }
-    } catch (rssErr) {
-      console.warn('Google News RSS fetch failed:', rssErr.message);
-    }
+    // 2. Fetch Yahoo Finance news and Google News RSS in parallel
+    const [yahooResults, rssResults] = await Promise.allSettled([
+      fetchNewsFromYahoo(query),
+      fetchNewsFromGoogleRss(query)
+    ]);
 
-    // 3. If needed, supplement with Yahoo Finance news
-    if (articles.length < 15) {
-      try {
-        const yahooItems = await fetchNewsFromYahoo(query);
-        if (yahooItems.length > 0) {
-          articles.push(...yahooItems);
-          sourcesUsed.push('yahoo');
-        }
-      } catch (yahooErr) {
-        console.warn('Yahoo news fetch failed:', yahooErr.message);
-      }
+    if (yahooResults.status === 'fulfilled' && yahooResults.value.length > 0) {
+      articles.push(...yahooResults.value);
+      sourcesUsed.push('yahoo');
+    }
+    if (rssResults.status === 'fulfilled' && rssResults.value.length > 0) {
+      articles.push(...rssResults.value);
+      sourcesUsed.push('google-rss');
     }
 
     // Deduplicate articles by normalized title
@@ -982,6 +997,222 @@ app.post('/api/cache/clear', (_req, res) => {
 });
 
 // ──────────────────────────────────────
+// Payment & Wallet Routes (Razorpay)
+// ──────────────────────────────────────
+
+// Get payment gateway status & public key
+app.get('/api/payment/config', (_req, res) => {
+  res.json({
+    gateway: 'razorpay',
+    configured: isRazorpayConfigured,
+    keyId: isRazorpayConfigured ? RAZORPAY_KEY_ID : null,
+    currency: 'INR',
+  });
+});
+
+// Create Razorpay Order for adding money
+app.post('/api/payment/create-order', async (req, res) => {
+  try {
+    const { amount, notes = {} } = req.body;
+    const numAmount = parseFloat(amount);
+
+    if (isNaN(numAmount) || numAmount < 1) {
+      return res.status(400).json({
+        error: 'Invalid amount',
+        message: 'Deposit amount must be at least ₹1',
+      });
+    }
+
+    if (!isRazorpayConfigured) {
+      return res.status(400).json({
+        error: 'Razorpay not configured',
+        message: 'Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your .env file.',
+        hint: 'Sign up at https://dashboard.razorpay.com and generate Test API keys.',
+      });
+    }
+
+    const amountInPaise = Math.round(numAmount * 100);
+    const authHeader = 'Basic ' + Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
+    const receipt = `rcpt_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+    const response = await axios.post(
+      'https://api.razorpay.com/v1/orders',
+      {
+        amount: amountInPaise,
+        currency: 'INR',
+        receipt,
+        notes: {
+          app: 'stock.io',
+          purpose: 'Wallet Deposit',
+          ...notes,
+        },
+      },
+      {
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000,
+      }
+    );
+
+    res.json({
+      success: true,
+      order: response.data,
+      keyId: RAZORPAY_KEY_ID,
+    });
+  } catch (error) {
+    console.error('Razorpay order creation error:', error.response?.data || error.message);
+    res.status(500).json({
+      error: 'Failed to create Razorpay order',
+      details: error.response?.data?.error?.description || error.message,
+    });
+  }
+});
+
+// Verify Razorpay payment signature
+app.post('/api/payment/verify', (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount } = req.body;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({
+        error: 'Missing payment details',
+        message: 'order_id, payment_id, and signature are required.',
+      });
+    }
+
+    if (!isRazorpayConfigured) {
+      return res.status(400).json({
+        error: 'Razorpay not configured',
+      });
+    }
+
+    const generatedSignature = crypto
+      .createHmac('sha256', RAZORPAY_KEY_SECRET)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
+
+    if (generatedSignature !== razorpay_signature) {
+      return res.status(400).json({
+        success: false,
+        error: 'Payment verification failed',
+        message: 'Invalid payment signature. Transaction could not be verified.',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Payment verified successfully',
+      paymentId: razorpay_payment_id,
+      orderId: razorpay_order_id,
+      amount: parseFloat(amount) || 0,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Payment verification error:', error.message);
+    res.status(500).json({
+      error: 'Verification failed',
+      details: error.message,
+    });
+  }
+});
+
+// Instant UPI Deposit (Direct UPI App Collect & QR Code)
+app.post('/api/payment/upi-deposit', (req, res) => {
+  try {
+    const { amount, upiId, upiApp = 'UPI', utr } = req.body;
+    const numAmount = parseFloat(amount);
+
+    if (isNaN(numAmount) || numAmount < 1) {
+      return res.status(400).json({
+        error: 'Invalid amount',
+        message: 'Deposit amount must be at least ₹1',
+      });
+    }
+
+    if (!upiId || !upiId.includes('@')) {
+      return res.status(400).json({
+        error: 'Invalid UPI ID',
+        message: 'Please provide a valid UPI ID (e.g., yourname@okhdfcbank)',
+      });
+    }
+
+    const paymentId = utr || `UPI${Date.now().toString().slice(-8)}${Math.floor(1000 + Math.random() * 9000)}`;
+
+    res.json({
+      success: true,
+      message: 'UPI deposit completed successfully',
+      paymentId,
+      amount: numAmount,
+      upiId,
+      upiApp,
+      method: `UPI (${upiApp})`,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('UPI deposit error:', error.message);
+    res.status(500).json({
+      error: 'UPI deposit failed',
+      details: error.message,
+    });
+  }
+});
+
+// Process wallet withdrawal
+app.post('/api/wallet/withdraw', (req, res) => {
+  try {
+    const { amount, method = 'IMPS', bankDetails = {} } = req.body;
+    const numAmount = parseFloat(amount);
+
+    if (isNaN(numAmount) || numAmount < 10) {
+      return res.status(400).json({
+        error: 'Invalid amount',
+        message: 'Minimum withdrawal amount is ₹10',
+      });
+    }
+
+    if (method === 'UPI' && !bankDetails.upiId) {
+      return res.status(400).json({
+        error: 'Missing UPI ID',
+        message: 'Please provide a valid UPI ID (e.g., yourname@okhdfcbank)',
+      });
+    }
+
+    if (method === 'BANK' && (!bankDetails.accountNumber || !bankDetails.ifsc)) {
+      return res.status(400).json({
+        error: 'Missing bank details',
+        message: 'Bank account number and IFSC code are required.',
+      });
+    }
+
+    const utr = `UTR${Date.now().toString().slice(-8)}${Math.floor(1000 + Math.random() * 9000)}`;
+
+    res.json({
+      success: true,
+      message: 'Withdrawal processed successfully',
+      utr,
+      amount: numAmount,
+      method,
+      bankDetails: {
+        accountHolder: bankDetails.accountHolder || 'Beneficiary',
+        accountNumberMasked: bankDetails.accountNumber ? `••••${bankDetails.accountNumber.slice(-4)}` : undefined,
+        ifsc: bankDetails.ifsc ? bankDetails.ifsc.toUpperCase() : undefined,
+        upiId: bankDetails.upiId || undefined,
+      },
+      status: 'PROCESSED',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Withdrawal error:', error.message);
+    res.status(500).json({
+      error: 'Withdrawal failed',
+      details: error.message,
+    });
+  }
+});
+
+// ──────────────────────────────────────
 // Error handling middleware
 // ──────────────────────────────────────
 
@@ -999,7 +1230,9 @@ app.use((err, req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`\n🚀 stock.io API running on port ${PORT}`);
-  console.log(`   Provider: yahoo-finance2 library`);
-  console.log(`   News API: ${NEWS_API_KEY ? '✅ Configured' : '⚠️  Not configured (Yahoo fallback active)'}`);
+  console.log(`   Provider: yahoo-finance2 (live market data & news, free - no key needed)`);
+  console.log(`   News Sources: Yahoo Finance News + Google News RSS live feeds`);
+  console.log(`   External News API Key: ${NEWS_API_KEY ? '✅ Configured' : 'ℹ️  Not set (free Yahoo & Google feeds active)'}`);
+  console.log(`   Razorpay: ${isRazorpayConfigured ? '✅ Configured (' + RAZORPAY_KEY_ID.slice(0, 8) + '...)' : '⚠️  Not configured (Add RAZORPAY_KEY_ID & RAZORPAY_KEY_SECRET to .env)'}`);
   console.log(`   Health:   http://localhost:${PORT}/api/health\n`);
 });

@@ -158,8 +158,7 @@ const News = () => {
             <div className="section-label">Market News</div>
             <h1 className="section-title news-title-main">Live headlines with cleaner market context</h1>
             <p className="news-hero-subtitle">
-              Search by stock, symbol, or sector. The backend can enrich stories through News API when
-              `NEWS_API_KEY` is configured, and otherwise falls back to Yahoo Finance news results.
+              Live Indian stock market headlines and sector stories powered by Yahoo Finance and real-time feeds.
             </p>
           </div>
           <div className="news-hero-status">

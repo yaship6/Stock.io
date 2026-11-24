@@ -45,6 +45,12 @@
   gap: 6px;
 }
 
+.sc-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .sc-symbol {
   font-family: var(--font-display);
   font-weight: 700;

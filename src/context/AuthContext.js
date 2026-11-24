@@ -66,13 +66,16 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('sv_watchlist', JSON.stringify(updated));
   };
 
-  const buyStock = (symbol, name, qty, price) => {
+  const buyStock = (symbol, name, qty, price, paymentDetails = { method: 'WALLET' }) => {
     const total = qty * price;
-    if (total > balance) return { success: false, error: 'Insufficient balance' };
-    
-    const newBalance = balance - total;
-    setBalance(newBalance);
-    localStorage.setItem('sv_balance', newBalance.toString());
+    const isWallet = !paymentDetails.method || paymentDetails.method === 'WALLET';
+
+    if (isWallet) {
+      if (total > balance) return { success: false, error: 'Insufficient wallet balance' };
+      const newBalance = balance - total;
+      setBalance(newBalance);
+      localStorage.setItem('sv_balance', newBalance.toString());
+    }
 
     const existing = portfolio.find(p => p.symbol === symbol);
     let updatedPortfolio;
@@ -88,21 +91,36 @@ export const AuthProvider = ({ children }) => {
     setPortfolio(updatedPortfolio);
     localStorage.setItem('sv_portfolio', JSON.stringify(updatedPortfolio));
 
-    const txn = { id: Date.now(), type: 'BUY', symbol, name, qty, price, total, date: new Date().toISOString() };
+    const txn = {
+      id: Date.now(),
+      type: 'BUY',
+      symbol,
+      name,
+      qty,
+      price,
+      total,
+      paymentMethod: paymentDetails.method || 'WALLET',
+      paymentId: paymentDetails.paymentId || '',
+      date: new Date().toISOString()
+    };
     const updatedTxns = [txn, ...transactions];
     setTransactions(updatedTxns);
     localStorage.setItem('sv_transactions', JSON.stringify(updatedTxns));
-    return { success: true };
+    return { success: true, txn };
   };
 
-  const sellStock = (symbol, qty, price) => {
+  const sellStock = (symbol, qty, price, payoutDetails = { method: 'WALLET' }) => {
     const holding = portfolio.find(p => p.symbol === symbol);
     if (!holding || holding.qty < qty) return { success: false, error: 'Not enough shares' };
 
     const total = qty * price;
-    const newBalance = balance + total;
-    setBalance(newBalance);
-    localStorage.setItem('sv_balance', newBalance.toString());
+    const isWallet = !payoutDetails.method || payoutDetails.method === 'WALLET';
+
+    if (isWallet) {
+      const newBalance = balance + total;
+      setBalance(newBalance);
+      localStorage.setItem('sv_balance', newBalance.toString());
+    }
 
     let updatedPortfolio;
     if (holding.qty === qty) {
@@ -115,18 +133,91 @@ export const AuthProvider = ({ children }) => {
     setPortfolio(updatedPortfolio);
     localStorage.setItem('sv_portfolio', JSON.stringify(updatedPortfolio));
 
-    const txn = { id: Date.now(), type: 'SELL', symbol, name: holding.name, qty, price, total, date: new Date().toISOString() };
+    const txn = {
+      id: Date.now(),
+      type: 'SELL',
+      symbol,
+      name: holding.name,
+      qty,
+      price,
+      total,
+      payoutMethod: payoutDetails.method || 'WALLET',
+      payoutId: payoutDetails.utr || payoutDetails.paymentId || '',
+      destination: payoutDetails.destination || '',
+      date: new Date().toISOString()
+    };
     const updatedTxns = [txn, ...transactions];
     setTransactions(updatedTxns);
     localStorage.setItem('sv_transactions', JSON.stringify(updatedTxns));
-    return { success: true };
+    return { success: true, txn };
+  };
+
+  const depositFunds = (amount, paymentDetails = {}) => {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return { success: false, error: 'Invalid deposit amount' };
+    }
+
+    const newBalance = balance + numAmount;
+    setBalance(newBalance);
+    localStorage.setItem('sv_balance', newBalance.toString());
+
+    const txn = {
+      id: Date.now(),
+      type: 'DEPOSIT',
+      amount: numAmount,
+      total: numAmount,
+      paymentId: paymentDetails.paymentId || `PAY_${Date.now()}`,
+      orderId: paymentDetails.orderId || '',
+      method: paymentDetails.method || 'Razorpay',
+      status: 'SUCCESS',
+      date: new Date().toISOString(),
+    };
+
+    const updatedTxns = [txn, ...transactions];
+    setTransactions(updatedTxns);
+    localStorage.setItem('sv_transactions', JSON.stringify(updatedTxns));
+    return { success: true, newBalance, txn };
+  };
+
+  const withdrawFunds = (amount, withdrawalDetails = {}) => {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return { success: false, error: 'Invalid withdrawal amount' };
+    }
+    if (numAmount > balance) {
+      return { success: false, error: 'Withdrawal amount exceeds available balance' };
+    }
+
+    const newBalance = balance - numAmount;
+    setBalance(newBalance);
+    localStorage.setItem('sv_balance', newBalance.toString());
+
+    const txn = {
+      id: Date.now(),
+      type: 'WITHDRAWAL',
+      amount: numAmount,
+      total: numAmount,
+      utr: withdrawalDetails.utr || `UTR${Date.now()}`,
+      method: withdrawalDetails.method || 'IMPS',
+      accountNumber: withdrawalDetails.accountNumberMasked || (withdrawalDetails.accountNumber ? `••••${withdrawalDetails.accountNumber.slice(-4)}` : ''),
+      upiId: withdrawalDetails.upiId || '',
+      status: 'SUCCESS',
+      date: new Date().toISOString(),
+    };
+
+    const updatedTxns = [txn, ...transactions];
+    setTransactions(updatedTxns);
+    localStorage.setItem('sv_transactions', JSON.stringify(updatedTxns));
+    return { success: true, newBalance, txn };
   };
 
   return (
     <AuthContext.Provider value={{
       user, login, signup, logout,
       portfolio, watchlist, transactions, balance,
-      addToWatchlist, removeFromWatchlist, buyStock, sellStock
+      addToWatchlist, removeFromWatchlist, buyStock, sellStock,
+      depositFunds, withdrawFunds
     }}>
       {children}
     </AuthContext.Provider>
