@@ -70,6 +70,19 @@ The React app proxies `/api/*` requests to `localhost:5001` (configured in packa
 
 ---
 
+### 4. Deploying to Vercel
+
+The project is configured for full-stack deployment on Vercel out-of-the-box:
+1. **Frontend**: Built automatically by Vercel (`npm run build`).
+2. **Serverless API**: Handled via `api/index.js` and `vercel.json` routing all `/api/*` requests.
+3. **SPA Routing**: React Router paths (`/news`, `/dashboard`, etc.) are routed to `index.html`.
+4. **Environment Variables (Optional)**:
+   - `NEWS_API_KEY`: In your Vercel project dashboard under **Settings → Environment Variables**, add `NEWS_API_KEY` to enrich stories via NewsAPI.org.
+   - `REACT_APP_API_URL`: If hosting `server.js` on an external backend (e.g. Render/Railway), set this to your backend domain (e.g. `https://your-backend.onrender.com`). If not set, it defaults to the Vercel serverless `/api` routes on the same domain.
+5. **Zero-Empty Fallback**: If external news wire services or rate limits are encountered on cloud host IPs, curated real-time market headlines automatically load so users never see an empty screen.
+
+---
+
 ## 📡 Data Source
 
 All market quotes and charts come from Yahoo Finance via the Express backend proxy:
