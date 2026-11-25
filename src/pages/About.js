@@ -5,18 +5,10 @@ import { TrendingUp, Brain, Shield, Zap, Users, Globe, Award, ArrowRight, Github
 import './About.css';
 
 const team = [
-  { name: 'Arjun Mehta', role: 'CEO & Co-Founder', desc: 'Ex-Goldman Sachs quant trader with 12 years in Indian markets', initials: 'AM' },
-  { name: 'Priya Nair', role: 'CTO & Co-Founder', desc: 'PhD in Machine Learning, ex-Google AI Research', initials: 'PN' },
-  { name: 'Vikram Shah', role: 'Head of Data Science', desc: 'Built predictive models for NSE HFT operations for 8 years', initials: 'VS' },
-  { name: 'Deepa Krishnan', role: 'Head of Product', desc: 'Previously at Zerodha and Groww, fintech product specialist', initials: 'DK' },
-];
-
-const milestones = [
-  { year: '2021', event: 'stock.io founded in Bengaluru with seed funding' },
-  { year: '2022', event: 'Launched beta with 500 early traders, first AI prediction model deployed' },
-  { year: '2023', event: 'Series A funding of ₹50 crore, expanded to 10,000+ users' },
-  { year: '2024', event: 'Launched Anomaly Detector & Risk AI; partnerships with 3 major brokers' },
-  { year: '2025', event: '15,000+ active traders, 99.2% uptime, SEBI recognized fintech startup' },
+  { name: 'Yashi Pandey', role: 'CEO & Co-Founder', desc: 'Ex-Goldman Sachs quant trader with 12 years in Indian markets', initials: 'YP' },
+  { name: 'Vaibhav Sharma', role: 'CTO & Co-Founder', desc: 'PhD in Machine Learning, ex-Google AI Research', initials: 'VS' },
+  { name: 'Kushagra Varshney', role: 'Head of Data Science', desc: 'Built predictive models for NSE HFT operations for 8 years', initials: 'KV' },
+  { name: 'Shivendra Singh', role: 'Head of Product', desc: 'Previously at Zerodha and Groww, fintech product specialist', initials: 'SS' },
 ];
 
 const About = () => (
@@ -103,23 +95,6 @@ const About = () => (
                 <a href="#"><Linkedin size={14} /></a>
                 <a href="#"><Twitter size={14} /></a>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-
-    {/* Timeline */}
-    <section className="section">
-      <div className="container">
-        <div className="section-label center">OUR JOURNEY</div>
-        <h2 className="section-title center">Milestones</h2>
-        <div className="timeline">
-          {milestones.map((m, i) => (
-            <div key={i} className={`timeline-item ${i % 2 === 0 ? 'left' : 'right'}`}>
-              <div className="timeline-year">{m.year}</div>
-              <div className="timeline-dot" />
-              <div className="timeline-content">{m.event}</div>
             </div>
           ))}
         </div>
