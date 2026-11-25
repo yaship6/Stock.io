@@ -727,15 +727,20 @@ const fetchNewsFromGoogleRss = async (queryTopic = 'Indian stock market', count 
       const descMatch = /<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/i.exec(itemXml);
       const sourceMatch = /<source[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/source>/i.exec(itemXml);
 
-      let fullTitle = titleMatch ? titleMatch[1].trim() : '';
-      fullTitle = fullTitle
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>');
+      const decodeEntities = (str = '') =>
+        str
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&apos;/g, "'")
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)));
 
-      let publisher = sourceMatch ? sourceMatch[1].trim().replace(/&amp;/g, '&') : '';
+      let fullTitle = titleMatch ? decodeEntities(titleMatch[1].trim()) : '';
+
+      let publisher = sourceMatch ? decodeEntities(sourceMatch[1].trim()) : '';
       let cleanTitle = fullTitle;
       if (publisher && cleanTitle.endsWith(` - ${publisher}`)) {
         cleanTitle = cleanTitle.substring(0, cleanTitle.length - (publisher.length + 3)).trim();
@@ -747,14 +752,15 @@ const fetchNewsFromGoogleRss = async (queryTopic = 'Indian stock market', count 
 
       let summary = '';
       if (descMatch) {
-        summary = descMatch[1]
+        summary = decodeEntities(decodeEntities(descMatch[1]))
           .replace(/<[^>]+>/g, ' ')
-          .replace(/&amp;/g, '&')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
           .replace(/\s+/g, ' ')
           .trim();
-        if (summary === cleanTitle || summary === fullTitle) {
+        if (
+          summary === cleanTitle ||
+          summary === fullTitle ||
+          (publisher && summary === `${cleanTitle} ${publisher}`)
+        ) {
           summary = '';
         }
       }
@@ -802,7 +808,7 @@ const fetchNewsFromYahoo = async (query) => {
     const result = await yahooFinance.search(cleanQuery, {
       quotesCount: 0,
       newsCount: 20,
-    });
+    }, { validateResult: false });
 
     return (result.news || []).map((item) => {
       const title = item.title || '';

@@ -5,6 +5,7 @@
   align-items: stretch;
   position: relative;
   overflow: hidden;
+  padding-top: 100px;
 }
 
 .auth-bg { position: absolute; inset: 0; pointer-events: none; }
