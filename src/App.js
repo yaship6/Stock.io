@@ -29,7 +29,6 @@ const Footer = () => (
           <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18 }}>
             stock<span style={{ color: 'var(--green-primary)' }}>.io</span>
           </span>
-          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', background: 'var(--badge-bg)', color: 'var(--green-primary)', padding: '2px 6px', borderRadius: 3 }}>BROKER UI</span>
         </div>
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           {[

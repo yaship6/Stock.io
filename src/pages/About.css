@@ -138,3 +138,16 @@
   .tech-grid { grid-template-columns: 1fr; }
   .about-stats { gap: 24px; padding: 20px; }
 }
+
+.team-id {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-bottom: 12px;
+}
+
+.team-tag {
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 8px;
+}

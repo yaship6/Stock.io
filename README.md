@@ -1,13 +1,6 @@
-# StockVision India
-
-A React + Node.js stock market workspace for Indian markets (NSE/BSE) with Yahoo Finance market data, optional News API enrichment, virtual trading, and AI-themed research pages.
-
----
-
-## 🚀 Quick Start
-
-### 1. Project Structure
-```
+#
+A React + Node.js stock market workspace for Indian markets (NSE/BSE) with Yahoo Finance market data, optional News API enrichment, virtual trading
+1. Project Structure
 stockvision/
 ├── server.js              ← Express backend (Yahoo Finance proxy)
 ├── server-package.json    ← Backend dependencies
@@ -47,14 +40,8 @@ stockvision/
 ```bash
 npm install express cors axios
 
-# Optional: copy env template and add your News API key
-cp .env.example .env
-
 # Run backend proxy on port 5001
 node server.js
-```
-
-`NEWS_API_KEY` is optional. If it is missing, the backend still serves finance data from Yahoo and falls back to Yahoo Finance news results.
 
 ### 3. Install & Run Frontend
 
@@ -79,8 +66,6 @@ The project is configured for full-stack deployment on Vercel out-of-the-box:
 4. **Environment Variables (Optional)**:
    - `NEWS_API_KEY`: In your Vercel project dashboard under **Settings → Environment Variables**, add `NEWS_API_KEY` to enrich stories via NewsAPI.org.
    - `REACT_APP_API_URL`: If hosting `server.js` on an external backend (e.g. Render/Railway), set this to your backend domain (e.g. `https://your-backend.onrender.com`). If not set, it defaults to the Vercel serverless `/api` routes on the same domain.
-5. **Zero-Empty Fallback**: If external news wire services or rate limits are encountered on cloud host IPs, curated real-time market headlines automatically load so users never see an empty screen.
-
 ---
 
 ## 📡 Data Source
@@ -167,5 +152,5 @@ News API does require `NEWS_API_KEY` if you want the richer headline source enab
 - **Virtual trading only** — no real money involved
 - Yahoo Finance may rate limit occasionally; lightweight local fallbacks remain in place
 - AI models simulate predictions for demo purposes
-- For production: add rate limiting, proper auth (JWT), and a real broker API
-# stockvision
+- For production: add rate limiting, proper auth (JWT), and a real market data/broker integration if you move beyond virtual trading
+

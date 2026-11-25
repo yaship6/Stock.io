@@ -66,23 +66,20 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('sv_watchlist', JSON.stringify(updated));
   };
 
-  const buyStock = (symbol, name, qty, price, paymentDetails = { method: 'WALLET' }) => {
+  const buyStock = (symbol, name, qty, price) => {
     const total = qty * price;
-    const isWallet = !paymentDetails.method || paymentDetails.method === 'WALLET';
+    if (total > balance) return { success: false, error: 'Insufficient balance' };
 
-    if (isWallet) {
-      if (total > balance) return { success: false, error: 'Insufficient wallet balance' };
-      const newBalance = balance - total;
-      setBalance(newBalance);
-      localStorage.setItem('sv_balance', newBalance.toString());
-    }
+    const newBalance = balance - total;
+    setBalance(newBalance);
+    localStorage.setItem('sv_balance', newBalance.toString());
 
-    const existing = portfolio.find(p => p.symbol === symbol);
+    const existing = portfolio.find((p) => p.symbol === symbol);
     let updatedPortfolio;
     if (existing) {
       const newQty = existing.qty + qty;
       const newAvg = ((existing.avgPrice * existing.qty) + (price * qty)) / newQty;
-      updatedPortfolio = portfolio.map(p =>
+      updatedPortfolio = portfolio.map((p) =>
         p.symbol === symbol ? { ...p, qty: newQty, avgPrice: newAvg } : p
       );
     } else {
@@ -91,18 +88,7 @@ export const AuthProvider = ({ children }) => {
     setPortfolio(updatedPortfolio);
     localStorage.setItem('sv_portfolio', JSON.stringify(updatedPortfolio));
 
-    const txn = {
-      id: Date.now(),
-      type: 'BUY',
-      symbol,
-      name,
-      qty,
-      price,
-      total,
-      paymentMethod: paymentDetails.method || 'WALLET',
-      paymentId: paymentDetails.paymentId || '',
-      date: new Date().toISOString()
-    };
+    const txn = { id: Date.now(), type: 'BUY', symbol, name, qty, price, total, date: new Date().toISOString() };
     const updatedTxns = [txn, ...transactions];
     setTransactions(updatedTxns);
     localStorage.setItem('sv_transactions', JSON.stringify(updatedTxns));

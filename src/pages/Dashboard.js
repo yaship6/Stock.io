@@ -9,7 +9,6 @@ import {
   useMarketSummary,
 } from '../hooks/useStockData';
 import BuySellModal from '../components/BuySellModal';
-import WalletModal from '../components/WalletModal';
 import StockCard from '../components/StockCard';
 import {
   TrendingUp,
@@ -17,8 +16,6 @@ import {
   Star,
   ArrowUpRight,
   ArrowDownRight,
-  ArrowDownLeft,
-  PlusCircle,
   Package,
   Search,
   Trash2,
@@ -28,7 +25,6 @@ import {
   Newspaper,
   RefreshCw,
   AlertCircle,
-  Wallet,
 } from 'lucide-react';
 import {
   LineChart,
@@ -110,7 +106,6 @@ const Dashboard = () => {
   const { stocks, loading: stocksLoading, error: stocksError, refetch: refetchStocks } = useTopStocks();
   const { summary, error: summaryError } = useMarketSummary();
   const [modal, setModal] = useState(null);
-  const [walletModal, setWalletModal] = useState(null);
   const [activeTab, setActiveTab] = useState('portfolio');
   const [txnFilter, setTxnFilter] = useState('ALL');
   const [searchQ, setSearchQ] = useState('');
@@ -165,9 +160,7 @@ const Dashboard = () => {
   ];
 
   const filteredTransactions = useMemo(() => {
-    if (txnFilter === 'TRADES') return transactions.filter(t => t.type === 'BUY' || t.type === 'SELL');
-    if (txnFilter === 'DEPOSIT') return transactions.filter(t => t.type === 'DEPOSIT');
-    if (txnFilter === 'WITHDRAWAL') return transactions.filter(t => t.type === 'WITHDRAWAL');
+    if (txnFilter === 'TRADES') return transactions.filter((t) => t.type === 'BUY' || t.type === 'SELL');
     return transactions;
   }, [transactions, txnFilter]);
 
@@ -187,14 +180,6 @@ const Dashboard = () => {
               <div className="dash-balance-top">
                 <span className="dash-balance-label"><IndianRupee size={13} /> Available Funds</span>
                 <span className="dash-balance-val">₹{balance.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-              </div>
-              <div className="dash-balance-actions">
-                <button className="btn-wallet-add" onClick={() => setWalletModal('deposit')}>
-                  <PlusCircle size={13} /> Add Money
-                </button>
-                <button className="btn-wallet-withdraw" onClick={() => setWalletModal('withdraw')}>
-                  <ArrowUpRight size={13} /> Withdraw
-                </button>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
@@ -452,8 +437,6 @@ const Dashboard = () => {
                   {[
                     { key: 'ALL', label: `All (${transactions.length})` },
                     { key: 'TRADES', label: `Trades (${transactions.filter((t) => t.type === 'BUY' || t.type === 'SELL').length})` },
-                    { key: 'DEPOSIT', label: `Deposits (${transactions.filter((t) => t.type === 'DEPOSIT').length})` },
-                    { key: 'WITHDRAWAL', label: `Withdrawals (${transactions.filter((t) => t.type === 'WITHDRAWAL').length})` },
                   ].map((f) => (
                     <button
                       key={f.key}
@@ -472,67 +455,23 @@ const Dashboard = () => {
                   </div>
                 ) : (
                   <div className="txn-list">
-                    {filteredTransactions.slice(0, 30).map((txn) => {
-                      if (txn.type === 'DEPOSIT') {
-                        return (
-                          <div key={txn.id} className="txn-row">
-                            <div className="txn-type deposit">DEPOSIT</div>
-                            <div>
-                              <div className="holding-sym">Added Funds (Razorpay)</div>
-                              <div className="holding-name">
-                                {new Date(txn.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                {txn.paymentId ? ` • ID: ${txn.paymentId}` : ''}
-                              </div>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <div className="font-mono positive" style={{ fontSize: 13, fontWeight: 700 }}>
-                                +₹{txn.amount?.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                              </div>
-                              <div style={{ fontSize: 11, color: 'var(--green-primary)' }}>Success</div>
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (txn.type === 'WITHDRAWAL') {
-                        return (
-                          <div key={txn.id} className="txn-row">
-                            <div className="txn-type withdraw">WITHDRAW</div>
-                            <div>
-                              <div className="holding-sym">Bank Payout ({txn.method || 'IMPS'})</div>
-                              <div className="holding-name">
-                                {new Date(txn.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                {txn.utr ? ` • UTR: ${txn.utr}` : ''}
-                              </div>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <div className="font-mono negative" style={{ fontSize: 13, fontWeight: 700 }}>
-                                -₹{txn.amount?.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                              </div>
-                              <div style={{ fontSize: 11, color: '#ffb833' }}>Processed</div>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return (
-                        <div key={txn.id} className="txn-row">
-                          <div className={`txn-type ${txn.type === 'BUY' ? 'buy' : 'sell'}`}>{txn.type}</div>
-                          <div>
-                            <div className="holding-sym">{txn.symbol?.replace('.NS', '')}</div>
-                            <div className="holding-name">
-                              {new Date(txn.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              {txn.paymentMethod && txn.paymentMethod !== 'WALLET' ? ` • Paid via ${txn.paymentMethod}` : ''}
-                              {txn.payoutMethod && txn.payoutMethod !== 'WALLET' ? ` • Disbursed via ${txn.payoutMethod}` : ''}
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div className="font-mono" style={{ fontSize: 13 }}>{txn.qty} × ₹{txn.price?.toFixed(2)}</div>
-                            <div className={`font-mono ${txn.type === 'BUY' ? 'negative' : 'positive'}`} style={{ fontSize: 13, fontWeight: 700 }}>
-                              {txn.type === 'BUY' ? '-' : '+'}₹{txn.total?.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                            </div>
+                    {filteredTransactions.slice(0, 30).map((txn) => (
+                      <div key={txn.id} className="txn-row">
+                        <div className={`txn-type ${txn.type === 'BUY' ? 'buy' : 'sell'}`}>{txn.type}</div>
+                        <div>
+                          <div className="holding-sym">{txn.symbol?.replace('.NS', '')}</div>
+                          <div className="holding-name">
+                            {new Date(txn.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </div>
                         </div>
-                      );
-                    })}
+                        <div style={{ textAlign: 'right' }}>
+                          <div className="font-mono" style={{ fontSize: 13 }}>{txn.qty} × ₹{txn.price?.toFixed(2)}</div>
+                          <div className={`font-mono ${txn.type === 'BUY' ? 'negative' : 'positive'}`} style={{ fontSize: 13, fontWeight: 700 }}>
+                            {txn.type === 'BUY' ? '-' : '+'}₹{txn.total?.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -576,13 +515,6 @@ const Dashboard = () => {
           stock={modal.stock}
           mode={modal.mode}
           onClose={() => setModal(null)}
-        />
-      )}
-
-      {walletModal && (
-        <WalletModal
-          initialMode={walletModal}
-          onClose={() => setWalletModal(null)}
         />
       )}
     </div>

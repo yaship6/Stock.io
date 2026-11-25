@@ -1,14 +1,42 @@
 // src/pages/About.js
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingUp, Brain, Shield, Zap, Users, Globe, Award, ArrowRight, Github, Twitter, Linkedin } from 'lucide-react';
+import { TrendingUp, Brain, Shield, Zap, Users, Globe, Award, ArrowRight } from 'lucide-react';
 import './About.css';
 
 const team = [
-  { name: 'Yashi Pandey', role: 'CEO & Co-Founder', desc: 'Ex-Goldman Sachs quant trader with 12 years in Indian markets', initials: 'YP' },
-  { name: 'Vaibhav Sharma', role: 'CTO & Co-Founder', desc: 'PhD in Machine Learning, ex-Google AI Research', initials: 'VS' },
-  { name: 'Kushagra Varshney', role: 'Head of Data Science', desc: 'Built predictive models for NSE HFT operations for 8 years', initials: 'KV' },
-  { name: 'Shivendra Singh', role: 'Head of Product', desc: 'Previously at Zerodha and Groww, fintech product specialist', initials: 'SS' },
+  {
+    name: 'Vaibhav Sharma',
+    id: 'S24CSEU0140',
+    desc: 'Stock search, live market data fetching and API error handling',
+    initials: 'VS',
+    tag: 'Data & API',
+    color: '#ff5a52',
+  },
+  {
+    name: 'Yashi Pandey',
+    id: 'S24CSEU0257',
+    desc: 'Responsive dashboard layout, Jira and Risk Analysis',
+    initials: 'YP',
+    tag: 'Dashboard & Charts',
+    color: '#2dff6f',
+  },
+  {
+    name: 'Kushagra Varshaney',
+    id: 'S24CSEU0060',
+    desc: 'LSTM dataset preparation, model training and prediction API',
+    initials: 'KV',
+    tag: 'ML Prediction',
+    color: '#ff5a52',
+  },
+  {
+    name: 'Shivendra Singh',
+    id: 'S24CSEU0416',
+    desc: 'News and sentiment analysis module analysis',
+    initials: 'SS',
+    tag: 'News & Sentiment',
+    color: '#2dff6f',
+  },
 ];
 
 const About = () => (
@@ -85,16 +113,13 @@ const About = () => (
         <div className="section-label center">THE TEAM</div>
         <h2 className="section-title center">Meet the Builders</h2>
         <div className="team-grid">
-          {team.map((member, i) => (
-            <div key={i} className="team-card">
-              <div className="team-avatar">{member.initials}</div>
+          {team.map((member) => (
+            <div key={member.id} className="team-card">
+              <div className="team-avatar" style={{ background: member.color, color: '#06110a' }}>{member.initials}</div>
               <h3>{member.name}</h3>
-              <div className="team-role">{member.role}</div>
+              <div className="team-id">{member.id}</div>
               <p>{member.desc}</p>
-              <div className="team-social">
-                <a href="#"><Linkedin size={14} /></a>
-                <a href="#"><Twitter size={14} /></a>
-              </div>
+              <div className="team-tag" style={{ color: member.color }}>{member.tag}</div>
             </div>
           ))}
         </div>
