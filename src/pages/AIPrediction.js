@@ -255,7 +255,6 @@ const AIPrediction = () => {
                   ))}
                 </div>
 
-                <p className="ai-disclaimer">⚠️ AI predictions use real market prices but simulated model output. Not financial advice. Past performance does not guarantee future results.</p>
               </div>
             )}
           </div>
